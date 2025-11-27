@@ -1,9 +1,16 @@
 // FileUpload.js - Модуль для загрузки файлов в чат Qwen.ai
-import axios from 'axios';
+//
+// ИЗМЕНЕНИЯ:
+// - Убраны зависимости: axios и ali-oss (заменены на браузерный контекст)
+// - Все HTTP-запросы выполняются через page.evaluate() в контексте браузера (обходит прокси/блокировки)
+// - OSS SDK загружается динамически в браузер через <script> тег вместо Node.js библиотеки
+// - Файлы конвертируются в base64 и передаются в браузер, затем в Blob для загрузки
+// - Используется pagePool для управления страницами браузера (переиспользование ресурсов)
+//
 import { getBrowserContext } from '../browser/browser.js';
 import { logInfo, logError } from '../logger/index.js';
-import { getAuthToken, extractAuthToken } from './chat.js';
-import OSS from 'ali-oss';
+import { getAuthToken, extractAuthToken, pagePool } from './chat.js';
+
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -11,9 +18,49 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOAD_DIR = path.join(__dirname, '../../uploads');
 
+const STS_TOKEN_API_URL = 'https://chat.qwen.ai/api/v1/files/getstsToken';
+const OSS_SDK_URL = 'https://gosspublic.alicdn.com/aliyun-oss-sdk-6.20.0.min.js';
+
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
+const DOCUMENT_EXTENSIONS = ['.pdf', '.doc', '.docx', '.txt'];
+const DEFAULT_FILE_TYPE = 'file';
+const IMAGE_FILE_TYPE = 'image';
+const DOCUMENT_FILE_TYPE = 'document';
+
 // Убедимся, что директория для загрузок существует
 if (!fs.existsSync(UPLOAD_DIR)) {
     fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
+
+/**
+ * Получает и валидирует browser context
+ * @returns {Object} - Browser context
+ * @throws {Error} - Если браузер не инициализирован
+ */
+function validateBrowserContext() {
+    const browserContext = getBrowserContext();
+    if (!browserContext) {
+        throw new Error('Браузер не инициализирован');
+    }
+    return browserContext;
+}
+
+/**
+ * Получает токен авторизации, извлекая из браузера при необходимости
+ * @param {Object} browserContext - Browser context
+ * @returns {Promise<string>} - Токен авторизации
+ * @throws {Error} - Если не удалось получить токен
+ */
+async function validateAuthToken(browserContext) {
+    let token = getAuthToken();
+    if (!token) {
+        logInfo('Токен авторизации не найден в памяти, пытаемся извлечь из браузера');
+        token = await extractAuthToken(browserContext);
+        if (!token) {
+            throw new Error('Не удалось получить токен авторизации');
+        }
+    }
+    return token;
 }
 
 /**
@@ -22,45 +69,60 @@ if (!fs.existsSync(UPLOAD_DIR)) {
  * @returns {Promise<Object>} - Объект с данными токена доступа
  */
 export async function getStsToken(fileInfo) {
+    const browserContext = validateBrowserContext();
+    const token = await validateAuthToken(browserContext);
+
+    logInfo(`Запрос STS токена для файла: ${fileInfo.filename}`);
+
+    let page = null;
     try {
-        logInfo(`Запрос STS токена для файла: ${fileInfo.filename}`);
-        
-        const browserContext = getBrowserContext();
-        if (!browserContext) {
-            throw new Error('Браузер не инициализирован');
-        }
-        
-        // Получаем токен авторизации с помощью существующей функции
-        let token = getAuthToken();
-        
-        // Если токен не найден, попробуем его извлечь
-        if (!token) {
-            logInfo('Токен авторизации не найден в памяти, пытаемся извлечь из браузера');
-            token = await extractAuthToken(browserContext);
-            
-            if (!token) {
-                throw new Error('Не удалось получить токен авторизации');
+        page = await pagePool.getPage(browserContext);
+
+        const result = await page.evaluate(async (data) => {
+            try {
+                const response = await fetch(data.apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${data.token}`,
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(data.fileInfo)
+                });
+
+                if (response.ok) {
+                    return { success: true, data: await response.json()};
+                } else {
+                    return {
+                        success: false,
+                        status: response.status,
+                        statusText: response.statusText,
+                        errorBody: await response.text()
+                    };
+                }
+            } catch (error) {
+                return { success: false, error: error.toString() };
             }
+        }, { apiUrl: STS_TOKEN_API_URL, token, fileInfo });
+
+        if (result.success) {
+            logInfo(`STS токен успешно получен для файла: ${fileInfo.filename}`);
+            return result.data;
+        } else {
+            logError(`Ошибка при получении STS токена: status=${result.status}, error=${result.errorBody || result.error}`);
+            throw new Error(`Ошибка получения STS токена: ${result.statusText || result.error}`);
         }
-        
-        logInfo('Токен авторизации получен, отправляем запрос на получение STS токена');
-        
-        // Запрос на получение STS токена
-        const response = await axios.post('https://chat.qwen.ai/api/v1/files/getstsToken', fileInfo, {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
-                'Origin': 'https://chat.qwen.ai',
-                'Referer': 'https://chat.qwen.ai/'
-            }
-        });
-        
-        logInfo(`STS токен успешно получен для файла: ${fileInfo.filename}`);
-        return response.data;
     } catch (error) {
         logError(`Ошибка при получении STS токена: ${error.message}`, error);
         throw error;
+    } finally {
+        if (page) {
+            try {
+                pagePool.releasePage(page);
+            } catch (e) {
+                logError('Ошибка при возврате страницы в пул:', e);
+            }
+        }
     }
 }
 
@@ -71,56 +133,100 @@ export async function getStsToken(fileInfo) {
  * @returns {Promise<Object>} - Результат загрузки файла
  */
 export async function uploadFile(filePath, stsData) {
+    const browserContext = validateBrowserContext();
+
+    logInfo(`Начало загрузки файла: ${filePath}`);
+    
+    if (!stsData?.file_path || !stsData?.access_key_id || !stsData?.access_key_secret || 
+        !stsData?.security_token || !stsData?.region || !stsData?.bucketname) {
+        throw new Error('Некорректные или неполные данные STS токена');
+    }
+    
+    logInfo(`[OSS] Загрузка через браузер`);
+    logInfo(`[OSS] Регион: ${stsData.region}, Бакет: ${stsData.bucketname}`);
+    if (stsData.endpoint) {
+        logInfo(`[OSS] Endpoint: ${stsData.endpoint}`);
+    }
+    
+    const fileBuffer = fs.readFileSync(filePath);
+    const fileBase64 = fileBuffer.toString('base64');
+    
+    logInfo(`[OSS] Размер файла: ${fileBuffer.length} байт`);
+    
+    let page = null;
     try {
-        logInfo(`Начало загрузки файла: ${filePath}`);
+        page = await pagePool.getPage(browserContext);
         
-        if (!stsData || !stsData.file_path) {
-            throw new Error('Некорректные данные STS токена');
-        }
-        
-        // Проверяем наличие необходимых данных для OSS
-        if (!stsData.access_key_id || !stsData.access_key_secret || !stsData.security_token ||
-            !stsData.region || !stsData.bucketname) {
-            throw new Error('Неполные данные STS токена для OSS');
-        }
-        
-        // Создаем клиент OSS с STS токеном
-        const client = new OSS({
-            region: stsData.region,
-            accessKeyId: stsData.access_key_id,
-            accessKeySecret: stsData.access_key_secret,
-            stsToken: stsData.security_token,
-            bucket: stsData.bucketname,
-            secure: true, // Используем HTTPS
-            timeout: 60000 // 60 секунд таймаут
+        const result = await page.evaluate(async (data) => {
+            try {
+                if (typeof window.OSS === 'undefined') {
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = data.ossSdkUrl;
+                        script.onload = resolve;
+                        script.onerror = reject;
+                        document.head.appendChild(script);
+                    });
+                }
+                // конверт base64 string в Blob
+                // const binaryString = atob(data.fileBase64);
+                // const bytes = new Uint8Array(binaryString.length);
+                // for (let i = 0; i < binaryString.length; i++) {
+                //     bytes[i] = binaryString.charCodeAt(i);
+                // }
+                // const blob = new Blob([bytes]);
+                const blob = new Blob([Uint8Array.from(atob(data.fileBase64), c => c.charCodeAt(0))])
+                
+                const client = new window.OSS({
+                    region: data.stsData.region,
+                    accessKeyId: data.stsData.access_key_id,
+                    accessKeySecret: data.stsData.access_key_secret,
+                    stsToken: data.stsData.security_token,
+                    bucket: data.stsData.bucketname,
+                    secure: true
+                });
+                
+                await client.put(data.stsData.file_path, blob);
+                return { success: true };
+            } catch (error) {
+                return { success: false, error: error.toString() };
+            }
+        }, {
+            fileBase64,
+            ossSdkUrl: OSS_SDK_URL,
+            stsData: {
+                region: stsData.region,
+                bucketname: stsData.bucketname,
+                file_path: stsData.file_path,
+                access_key_id: stsData.access_key_id,
+                access_key_secret: stsData.access_key_secret,
+                security_token: stsData.security_token
+            }
         });
         
-        logInfo(`OSS клиент создан для региона ${stsData.region}, бакет: ${stsData.bucketname}`);
-        
-        // Получаем имя объекта из file_path
-        const objectName = stsData.file_path;
-        
-        // Загружаем файл
-        logInfo(`Загрузка файла в OSS: ${objectName}`);
-        const result = await client.put(objectName, filePath);
-        
-        logInfo(`Файл успешно загружен в OSS: ${objectName}`);
-        logInfo(`URL файла: ${stsData.file_url}`);
-        
-        return {
-            success: true,
-            fileName: path.basename(filePath),
-            url: stsData.file_url,
-            fileId: stsData.file_id,
-            filePath: stsData.file_path,
-            ossResponse: result
-        };
+        if (result.success) {
+            return {
+                success: true,
+                fileName: path.basename(filePath),
+                url: stsData.file_url,
+                fileId: stsData.file_id,
+                filePath: stsData.file_path
+            };
+        } else {
+            logError(`[OSS] Ошибка загрузки: ${result.error}`);
+            throw new Error(`Ошибка загрузки в OSS: ${result.error}`);
+        }
     } catch (error) {
         logError(`Ошибка при загрузке файла в OSS: ${error.message}`, error);
-        return {
-            success: false,
-            error: error.message
-        };
+        throw error;
+    } finally {
+        if (page) {
+            try {
+                pagePool.releasePage(page);
+            } catch (e) {
+                logError('Ошибка при возврате страницы в пул:', e);
+            }
+        }
     }
 }
 
@@ -141,11 +247,11 @@ export async function uploadFileToQwen(filePath) {
         const fileExt = path.extname(fileName).toLowerCase();
         
         // Определяем тип файла
-        let fileType = 'file';
-        if (['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'].includes(fileExt)) {
-            fileType = 'image';
-        } else if (['.pdf', '.doc', '.docx', '.txt'].includes(fileExt)) {
-            fileType = 'document';
+        let fileType = DEFAULT_FILE_TYPE;
+        if (IMAGE_EXTENSIONS.includes(fileExt)) {
+            fileType = IMAGE_FILE_TYPE;
+        } else if (DOCUMENT_EXTENSIONS.includes(fileExt)) {
+            fileType = DOCUMENT_FILE_TYPE;
         }
         
         // Запрашиваем STS токен
@@ -179,4 +285,3 @@ export default {
     uploadFile,
     uploadFileToQwen
 };
-
