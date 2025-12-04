@@ -1,15 +1,8 @@
 // FileUpload.js - Модуль для загрузки файлов в чат Qwen.ai
-//
-// ИЗМЕНЕНИЯ:
-// - Убраны зависимости: axios и ali-oss (заменены на браузерный контекст)
-// - Все HTTP-запросы выполняются через page.evaluate() в контексте браузера (обходит прокси/блокировки)
-// - OSS SDK загружается динамически в браузер через <script> тег вместо Node.js библиотеки
-// - Файлы конвертируются в base64 и передаются в браузер, затем в Blob для загрузки
-// - Используется pagePool для управления страницами браузера (переиспользование ресурсов)
-//
 import { getBrowserContext } from '../browser/browser.js';
 import { logInfo, logError } from '../logger/index.js';
 import { getAuthToken, extractAuthToken, pagePool } from './chat.js';
+import { getAvailableToken } from './tokenManager.js';
 
 import fs from 'fs';
 import path from 'path';
@@ -52,7 +45,18 @@ function validateBrowserContext() {
  * @throws {Error} - Если не удалось получить токен
  */
 async function validateAuthToken(browserContext) {
-    let token = getAuthToken();
+    let tokenObj = await getAvailableToken();
+    let token = null;
+    
+    if (tokenObj && tokenObj.token) {
+        token = tokenObj.token;
+        logInfo(`Используется токен из tokenManager: ${tokenObj.id}`);
+    }
+    
+    if (!token) {
+        token = getAuthToken();
+    }
+    
     if (!token) {
         logInfo('Токен авторизации не найден в памяти, пытаемся извлечь из браузера');
         token = await extractAuthToken(browserContext);
@@ -60,6 +64,7 @@ async function validateAuthToken(browserContext) {
             throw new Error('Не удалось получить токен авторизации');
         }
     }
+    
     return token;
 }
 
@@ -168,13 +173,6 @@ export async function uploadFile(filePath, stsData) {
                         document.head.appendChild(script);
                     });
                 }
-                // конверт base64 string в Blob
-                // const binaryString = atob(data.fileBase64);
-                // const bytes = new Uint8Array(binaryString.length);
-                // for (let i = 0; i < binaryString.length; i++) {
-                //     bytes[i] = binaryString.charCodeAt(i);
-                // }
-                // const blob = new Blob([bytes]);
                 const blob = new Blob([Uint8Array.from(atob(data.fileBase64), c => c.charCodeAt(0))])
                 
                 const client = new window.OSS({
@@ -263,7 +261,6 @@ export async function uploadFileToQwen(filePath) {
         
         const stsData = await getStsToken(fileInfo);
         
-        // Загружаем файл с использованием полученных данных
         const uploadResult = await uploadFile(filePath, stsData);
         
         return {
