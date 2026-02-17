@@ -1,3 +1,5 @@
+import { DEFAULT_MODEL } from '../config.js';
+
 const CANONICAL_MODELS = Object.freeze([
     "qwen3-max",
     "qwen3-vl-plus",
@@ -162,7 +164,7 @@ export const MODEL_MAPPING = buildModelMapping();
  * @param {string} defaultModel - Модель по умолчанию
  * @returns {string} - Доступная модель
  */
-export function getMappedModel(requestedModel, defaultModel = "qwen-max-latest") {
+export function getMappedModel(requestedModel, defaultModel = DEFAULT_MODEL) {
     if (!requestedModel) return defaultModel;
 
     // Проверяем точное соответствие в словаре

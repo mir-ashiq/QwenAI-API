@@ -1,4 +1,3 @@
-import readline from 'readline';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -7,68 +6,56 @@ import { initBrowser, shutdownBrowser, getBrowserContext } from '../browser/brow
 import { extractAuthToken } from '../api/chat.js';
 import { loadTokens, saveTokens, markValid, removeToken } from '../api/tokenManager.js';
 import { loadAuthToken } from '../browser/session.js';
+import { logInfo, logError, logWarn } from '../logger/index.js';
+import { prompt } from './prompt.js';
+import { SESSION_DIR, ACCOUNTS_DIR } from '../config.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-function prompt(question) {
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    return new Promise(resolve => rl.question(question, ans => { rl.close(); resolve(ans.trim()); }));
-}
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function ensureAccountDir(id) {
-    const accountDir = path.join(__dirname, '..', '..', 'session', 'accounts', id);
-    if (!fs.existsSync(accountDir)) {
-        fs.mkdirSync(accountDir, { recursive: true });
-    }
+    const accountDir = path.resolve(__dirname, '..', '..', SESSION_DIR, ACCOUNTS_DIR, id);
+    if (!fs.existsSync(accountDir)) fs.mkdirSync(accountDir, { recursive: true });
     return accountDir;
 }
 
 export async function addAccountInteractive() {
-    console.log('======================================================');
-    console.log('Добавление нового аккаунта Qwen');
-    console.log('Браузер откроется, войдите в систему, затем вернитесь к консоли.');
-    console.log('======================================================');
+    logInfo('======================================================');
+    logInfo('Добавление нового аккаунта Qwen');
+    logInfo('Браузер откроется, войдите в систему, затем вернитесь к консоли.');
+    logInfo('======================================================');
 
     const ok = await initBrowser(true, true);
     if (!ok) {
-        console.error('Не удалось запустить браузер.');
+        logError('Не удалось запустить браузер.');
         return null;
     }
-
-
 
     const ctx = getBrowserContext();
     let token = await extractAuthToken(ctx, true);
 
     if (!token) {
         token = loadAuthToken();
-        if (token) {
-            console.log('Токен получен из сохранённого файла.');
-        }
+        if (token) logInfo('Токен получен из сохранённого файла.');
     }
 
     if (!token) {
-        console.error('Токен не был получен. Аккаунт не добавлен.');
+        logError('Токен не был получен. Аккаунт не добавлен.');
         await shutdownBrowser();
         return null;
     }
 
     await shutdownBrowser();
-    // ---
 
     const id = 'acc_' + Date.now();
-
-
     ensureAccountDir(id);
-    fs.writeFileSync(path.join(__dirname, '..', '..', 'session', 'accounts', id, 'token.txt'), token, 'utf8');
+    fs.writeFileSync(path.resolve(__dirname, '..', '..', SESSION_DIR, ACCOUNTS_DIR, id, 'token.txt'), token, 'utf8');
 
     const list = loadTokens();
     list.push({ id, token, resetAt: null });
     saveTokens(list);
 
-    console.log(`Аккаунт '${id}' добавлен. Всего аккаунтов: ${list.length}`);
-    console.log('======================================================');
+    logInfo(`Аккаунт '${id}' добавлен. Всего аккаунтов: ${list.length}`);
+    logInfo('======================================================');
     return id;
 }
 
@@ -78,13 +65,9 @@ export async function interactiveAccountMenu() {
         console.log('1 - Добавить новый аккаунт');
         console.log('2 - Завершить');
         const choice = await prompt('Ваш выбор (1/2): ');
-        if (choice === '1') {
-            await addAccountInteractive();
-        } else if (choice === '2') {
-            break;
-        } else {
-            console.log('Неверный выбор.');
-        }
+        if (choice === '1') await addAccountInteractive();
+        else if (choice === '2') break;
+        else console.log('Неверный выбор.');
     }
 }
 
@@ -107,26 +90,18 @@ export async function reloginAccountInteractive() {
     }
     const account = invalids[num - 1];
 
-    console.log(`\nПовторная авторизация для ${account.id}`);
+    logInfo(`Повторная авторизация для ${account.id}`);
     const ok = await initBrowser(true, true);
-    if (!ok) {
-        console.error('Не удалось запустить браузер.');
-        return;
-    }
+    if (!ok) { logError('Не удалось запустить браузер.'); return; }
 
     const token = await extractAuthToken(getBrowserContext(), true);
     await shutdownBrowser();
 
-    if (!token) {
-        console.error('Не удалось извлечь токен.');
-        return;
-    }
+    if (!token) { logError('Не удалось извлечь токен.'); return; }
 
-    // сохраняем новый токен и снимаем invalid
     markValid(account.id, token);
-    fs.writeFileSync(path.join(__dirname, '..', '..', 'session', 'accounts', account.id, 'token.txt'), token, 'utf8');
-
-    console.log(`Токен обновлён для ${account.id}`);
+    fs.writeFileSync(path.resolve(__dirname, '..', '..', SESSION_DIR, ACCOUNTS_DIR, account.id, 'token.txt'), token, 'utf8');
+    logInfo(`Токен обновлён для ${account.id}`);
 }
 
 export async function removeAccountInteractive() {
@@ -147,18 +122,15 @@ export async function removeAccountInteractive() {
         await prompt('ENTER чтобы вернуться...');
         return;
     }
+
     const acc = tokens[num - 1];
     const confirm = await prompt(`Точно удалить ${acc.id}? (y/N): `);
     if (confirm.toLowerCase() !== 'y') return;
 
     removeToken(acc.id);
+    const dir = path.resolve(__dirname, '..', '..', SESSION_DIR, ACCOUNTS_DIR, acc.id);
+    if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
 
-    // удалить директорию аккаунта
-    const dir = path.join(__dirname, '..', '..', 'session', 'accounts', acc.id);
-    if (fs.existsSync(dir)) {
-        fs.rmSync(dir, { recursive: true, force: true });
-    }
-
-    console.log(`Аккаунт ${acc.id} удалён.`);
+    logInfo(`Аккаунт ${acc.id} удалён.`);
     await prompt('ENTER чтобы вернуться...');
-} 
+}

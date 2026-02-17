@@ -3,13 +3,11 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import { logInfo, logError, logDebug } from '../logger/index.js';
+import { SESSION_DIR, MAX_HISTORY_LENGTH } from '../config.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const HISTORY_DIR = path.join(__dirname, '..', '..', 'session', 'history');
-
-const MAX_HISTORY_LENGTH = 100;
+const HISTORY_DIR = path.resolve(__dirname, '..', '..', SESSION_DIR, 'history');
 
 export function initHistoryDirectory() {
     if (!fs.existsSync(HISTORY_DIR)) {

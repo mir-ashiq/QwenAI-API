@@ -1,14 +1,8 @@
 #!/usr/bin/env node
 
-import readline from 'readline';
-
 import { loadTokens } from '../src/api/tokenManager.js';
 import { addAccountInteractive, reloginAccountInteractive, removeAccountInteractive } from '../src/utils/accountSetup.js';
-
-function prompt(question) {
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    return new Promise(resolve => rl.question(question, answer => { rl.close(); resolve(answer.trim()); }));
-}
+import { prompt } from '../src/utils/prompt.js';
 
 function printDivider() {
     console.log('======================================================');

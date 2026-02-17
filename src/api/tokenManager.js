@@ -1,35 +1,29 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { logError } from '../logger/index.js';
+import { SESSION_DIR, ACCOUNTS_DIR } from '../config.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const SESSION_PATH = path.resolve(__dirname, '..', '..', SESSION_DIR);
+const ACCOUNTS_PATH = path.join(SESSION_PATH, ACCOUNTS_DIR);
+const TOKENS_FILE = path.join(SESSION_PATH, 'tokens.json');
+
 let pointer = 0;
 
-// Директория для хранения сессий и данных аккаунтов
-const SESSION_DIR = path.join(__dirname, '..', '..', 'session');
-const ACCOUNTS_DIR = path.join(SESSION_DIR, 'accounts');
-const TOKENS_FILE = path.join(SESSION_DIR, 'tokens.json');
-
 function ensureSessionDir() {
-    if (!fs.existsSync(SESSION_DIR)) {
-        fs.mkdirSync(SESSION_DIR, { recursive: true });
-    }
-    if (!fs.existsSync(ACCOUNTS_DIR)) {
-        fs.mkdirSync(ACCOUNTS_DIR, { recursive: true });
-    }
+    if (!fs.existsSync(SESSION_PATH)) fs.mkdirSync(SESSION_PATH, { recursive: true });
+    if (!fs.existsSync(ACCOUNTS_PATH)) fs.mkdirSync(ACCOUNTS_PATH, { recursive: true });
 }
 
 export function loadTokens() {
     ensureSessionDir();
-    if (!fs.existsSync(TOKENS_FILE)) {
-        return [];
-    }
+    if (!fs.existsSync(TOKENS_FILE)) return [];
     try {
-        const data = fs.readFileSync(TOKENS_FILE, 'utf8');
-        return JSON.parse(data);
+        return JSON.parse(fs.readFileSync(TOKENS_FILE, 'utf8'));
     } catch (e) {
-        console.error('TokenManager: ошибка чтения tokens.json:', e);
+        logError('TokenManager: ошибка чтения tokens.json', e);
         return [];
     }
 }
@@ -39,7 +33,7 @@ export function saveTokens(tokens) {
     try {
         fs.writeFileSync(TOKENS_FILE, JSON.stringify(tokens, null, 2), 'utf8');
     } catch (e) {
-        console.error('TokenManager: ошибка сохранения tokens.json:', e);
+        logError('TokenManager: ошибка сохранения tokens.json', e);
     }
 }
 
@@ -63,16 +57,13 @@ export function markRateLimited(id, hours = 24) {
     const tokens = loadTokens();
     const idx = tokens.findIndex(t => t.id === id);
     if (idx !== -1) {
-        const until = new Date(Date.now() + hours * 3600 * 1000).toISOString();
-        tokens[idx].resetAt = until;
+        tokens[idx].resetAt = new Date(Date.now() + hours * 3600 * 1000).toISOString();
         saveTokens(tokens);
     }
 }
 
 export function removeToken(id) {
-    const tokens = loadTokens();
-    const filtered = tokens.filter(t => t.id !== id);
-    saveTokens(filtered);
+    saveTokens(loadTokens().filter(t => t.id !== id));
 }
 
 export { removeToken as removeInvalidToken };
@@ -80,10 +71,7 @@ export { removeToken as removeInvalidToken };
 export function markInvalid(id) {
     const tokens = loadTokens();
     const idx = tokens.findIndex(t => t.id === id);
-    if (idx !== -1) {
-        tokens[idx].invalid = true;
-        saveTokens(tokens);
-    }
+    if (idx !== -1) { tokens[idx].invalid = true; saveTokens(tokens); }
 }
 
 export function markValid(id, newToken) {
@@ -99,4 +87,4 @@ export function markValid(id, newToken) {
 
 export function listTokens() {
     return loadTokens();
-} 
+}
