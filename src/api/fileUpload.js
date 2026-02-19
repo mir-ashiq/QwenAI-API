@@ -1,9 +1,8 @@
-// Simplified fileUpload.js - Direct HTTP calls, no browser automation
+// Simplified fileUpload.js - Direct HTTP calls, no browser automation, memory-based uploads
 import { getAvailableToken } from './tokenManager.js';
 import { logInfo, logError } from '../logger/index.js';
-import fs from 'fs';
 import path from 'path';
-import { STS_TOKEN_API_URL, UPLOADS_DIR } from '../config.js';
+import { STS_TOKEN_API_URL } from '../config.js';
 import fetch from 'node-fetch';
 import OSS from 'ali-oss';
 
@@ -47,8 +46,8 @@ export async function getStsToken(fileInfo) {
     }
 }
 
-export async function uploadFile(filePath, stsData) {
-    logInfo(`Starting file upload: ${filePath}`);
+export async function uploadFile(fileBuffer, fileName, stsData) {
+    logInfo(`Starting file upload: ${fileName}`);
 
     if (!stsData?.file_path || !stsData?.access_key_id || !stsData?.access_key_secret ||
         !stsData?.security_token || !stsData?.region || !stsData?.bucketname) {
@@ -68,7 +67,6 @@ export async function uploadFile(filePath, stsData) {
             secure: true
         });
 
-        const fileBuffer = fs.readFileSync(filePath);
         logInfo(`[OSS] File size: ${fileBuffer.length} bytes`);
 
         await client.put(stsData.file_path, fileBuffer);
@@ -76,7 +74,7 @@ export async function uploadFile(filePath, stsData) {
         logInfo(`[OSS] File uploaded successfully`);
         return {
             success: true,
-            fileName: path.basename(filePath),
+            fileName: fileName,
             url: stsData.file_url,
             fileId: stsData.file_id,
             filePath: stsData.file_path
@@ -87,15 +85,15 @@ export async function uploadFile(filePath, stsData) {
     }
 }
 
-export async function uploadFileToQwen(filePath) {
+export async function uploadFileToQwen(fileData) {
     try {
-        if (!fs.existsSync(filePath)) {
-            throw new Error(`File not found: ${filePath}`);
+        const { buffer, filename, size, mimetype } = fileData;
+
+        if (!buffer) {
+            throw new Error('File buffer is required');
         }
 
-        const fileName = path.basename(filePath);
-        const fileSize = fs.statSync(filePath).size;
-        const fileExt = path.extname(fileName).toLowerCase();
+        const fileExt = path.extname(filename).toLowerCase();
 
         let fileType = DEFAULT_FILE_TYPE;
         if (IMAGE_EXTENSIONS.includes(fileExt)) {
@@ -105,13 +103,13 @@ export async function uploadFileToQwen(filePath) {
         }
 
         const fileInfo = {
-            filename: fileName,
-            filesize: fileSize,
+            filename: filename,
+            filesize: size,
             filetype: fileType
         };
 
         const stsData = await getStsToken(fileInfo);
-        const uploadResult = await uploadFile(filePath, stsData);
+        const uploadResult = await uploadFile(buffer, filename, stsData);
 
         return {
             ...uploadResult,

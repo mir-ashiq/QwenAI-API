@@ -12,9 +12,15 @@ const TOKENS_FILE = path.join(SESSION_PATH, 'tokens.json');
 
 let pointer = 0;
 
+// Optional: Only create directories if we need to write files
 function ensureSessionDir() {
-    if (!fs.existsSync(SESSION_PATH)) fs.mkdirSync(SESSION_PATH, { recursive: true });
-    if (!fs.existsSync(ACCOUNTS_PATH)) fs.mkdirSync(ACCOUNTS_PATH, { recursive: true });
+    try {
+        if (!fs.existsSync(SESSION_PATH)) fs.mkdirSync(SESSION_PATH, { recursive: true });
+        if (!fs.existsSync(ACCOUNTS_PATH)) fs.mkdirSync(ACCOUNTS_PATH, { recursive: true });
+    } catch (error) {
+        // Ignore errors if file system is not available (e.g., in serverless environments)
+        logError('Could not create session directory (file system may not be available)', error);
+    }
 }
 
 /**
@@ -69,19 +75,19 @@ function loadTokensFromEnv() {
 }
 
 /**
- * Load tokens from session/tokens.json file
+ * Load tokens from session/tokens.json file (optional, only if file exists)
  */
 function loadTokensFromFile() {
-    ensureSessionDir();
-    if (!fs.existsSync(TOKENS_FILE)) return [];
     try {
+        if (!fs.existsSync(TOKENS_FILE)) return [];
         const fileTokens = JSON.parse(fs.readFileSync(TOKENS_FILE, 'utf8'));
         if (fileTokens.length > 0) {
             logInfo(`Loaded ${fileTokens.length} token(s) from session/tokens.json`);
         }
         return fileTokens;
     } catch (e) {
-        logError('TokenManager: error reading tokens.json', e);
+        // File system may not be available (e.g., serverless environment)
+        logError('TokenManager: error reading tokens.json (file system may not be available)', e);
         return [];
     }
 }
@@ -99,13 +105,15 @@ export function loadTokens() {
 }
 
 export function saveTokens(tokens) {
-    ensureSessionDir();
     // Only save tokens that are not from environment variables
     const fileTokens = tokens.filter(t => t.source !== 'env');
+    
     try {
+        ensureSessionDir();
         fs.writeFileSync(TOKENS_FILE, JSON.stringify(fileTokens, null, 2), 'utf8');
     } catch (e) {
-        logError('TokenManager: error saving tokens.json', e);
+        // Ignore if file system is not available - tokens from env will still work
+        logError('TokenManager: error saving tokens.json (file system may not be available)', e);
     }
 }
 

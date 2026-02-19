@@ -1,89 +1,72 @@
-import winston from 'winston';
+// Console-only logger (no file system dependencies)
 import morgan from 'morgan';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
-import { LOG_LEVEL, LOG_MAX_SIZE, LOG_MAX_FILES, LOGS_DIR } from '../config.js';
+import { LOG_LEVEL } from '../config.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-const LOG_DIR = path.resolve(__dirname, '..', '..', LOGS_DIR);
-if (!fs.existsSync(LOG_DIR)) {
-    fs.mkdirSync(LOG_DIR, { recursive: true });
-}
-
-const { combine, timestamp, printf, colorize } = winston.format;
-
-const consoleFormat = combine(
-    colorize({ all: true }),
-    timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-    printf(({ level, message, timestamp }) => `${timestamp} [${level}]: ${message}`)
-);
-
-const fileFormat = combine(
-    timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-    printf(({ level, message, timestamp }) => `${timestamp} [${level}]: ${message}`)
-);
-
-const customLevels = {
-    levels: { error: 0, warn: 1, info: 2, http: 3, debug: 4, raw: 5 },
-    colors: { error: 'red', warn: 'yellow', info: 'green', http: 'cyan', debug: 'blue', raw: 'magenta' }
+const LOG_LEVELS = {
+    error: 0,
+    warn: 1,
+    info: 2,
+    http: 3,
+    debug: 4,
+    raw: 5
 };
 
-const logger = winston.createLogger({
-    levels: customLevels.levels,
-    level: LOG_LEVEL,
-    format: fileFormat,
-    transports: [
-        new winston.transports.File({
-            filename: path.join(LOG_DIR, 'combined.log'),
-            maxsize: LOG_MAX_SIZE,
-            maxFiles: LOG_MAX_FILES
-        }),
-        new winston.transports.File({
-            filename: path.join(LOG_DIR, 'http.log'),
-            level: 'http',
-            maxsize: LOG_MAX_SIZE,
-            maxFiles: LOG_MAX_FILES
-        }),
-        new winston.transports.File({
-            filename: path.join(LOG_DIR, 'error.log'),
-            level: 'error',
-            maxsize: LOG_MAX_SIZE,
-            maxFiles: LOG_MAX_FILES
-        }),
-        new winston.transports.File({
-            filename: path.join(LOG_DIR, 'raw-responses.log'),
-            level: 'raw',
-            maxsize: LOG_MAX_SIZE,
-            maxFiles: LOG_MAX_FILES
-        }),
-        new winston.transports.Console({ format: consoleFormat })
-    ]
-});
+const COLORS = {
+    error: '\x1b[31m',   // Red
+    warn: '\x1b[33m',    // Yellow
+    info: '\x1b[32m',    // Green
+    http: '\x1b[36m',    // Cyan
+    debug: '\x1b[34m',   // Blue
+    raw: '\x1b[35m',     // Magenta
+    reset: '\x1b[0m'
+};
 
-winston.addColors(customLevels.colors);
+const currentLogLevel = LOG_LEVELS[LOG_LEVEL] ?? LOG_LEVELS.info;
 
+function formatTimestamp() {
+    const now = new Date();
+    return now.toISOString().replace('T', ' ').substring(0, 19);
+}
+
+function log(level, message) {
+    if (LOG_LEVELS[level] > currentLogLevel) return;
+    
+    const timestamp = formatTimestamp();
+    const color = COLORS[level] || '';
+    const reset = COLORS.reset;
+    
+    console.log(`${timestamp} [${color}${level}${reset}]: ${message}`);
+}
+
+// HTTP request logger using morgan
 const morganStream = {
-    write: (message) => logger.http(message.trim())
+    write: (message) => log('http', message.trim())
 };
 
 const morganFormat = ':remote-addr :method :url :status :res[content-length] - :response-time ms';
 const httpLogger = morgan(morganFormat, { stream: morganStream });
 
 export const logHttpRequest = httpLogger;
-export const logInfo = (message) => logger.info(message);
+
+export const logInfo = (message) => log('info', message);
+
 export const logError = (message, error) => {
     if (error) {
-        logger.error(`${message}: ${error.message}`);
-        logger.error(error.stack);
+        log('error', `${message}: ${error.message}`);
+        if (error.stack) {
+            log('error', error.stack);
+        }
     } else {
-        logger.error(message);
+        log('error', message);
     }
 };
-export const logWarn = (message) => logger.warn(message);
-export const logDebug = (message) => logger.debug(message);
-export const logRaw = (message) => logger.raw(message);
-export const logHttp = (message) => logger.http(message);
+
+export const logWarn = (message) => log('warn', message);
+
+export const logDebug = (message) => log('debug', message);
+
+export const logRaw = (message) => log('raw', message);
+
+export const logHttp = (message) => log('http', message);
 
 export default { logHttpRequest, logInfo, logError, logWarn, logDebug, logRaw, logHttp };

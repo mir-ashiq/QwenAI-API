@@ -5,31 +5,15 @@ import { logInfo, logError, logDebug } from '../logger/index.js';
 import { getMappedModel } from './modelMapping.js';
 import { getStsToken, uploadFileToQwen } from './fileUpload.js';
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
 import crypto from 'crypto';
 import { listTokens, markInvalid, markRateLimited, markValid, hasValidTokens } from './tokenManager.js';
 
 const router = express.Router();
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        const uploadDir = path.join(process.cwd(), 'uploads');
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
-    },
-    filename: function (req, file, cb) {
-        const uniqueSuffix = Date.now() + '-' + crypto.randomBytes(8).toString('hex');
-        cb(null, uniqueSuffix + '-' + file.originalname);
-    }
-});
-
+// Configure multer for file uploads (memory storage - no disk writes)
 const upload = multer({
-    storage: storage,
-    limits: { fileSize: 10 * 1024 * 1024 } // 10MB max size
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 25 * 1024 * 1024 } // 25MB max size
 });
 
 function authMiddleware(req, res, next) {
@@ -597,13 +581,15 @@ router.post('/files/upload', upload.single('file'), async (req, res) => {
             return res.status(400).json({ error: 'File was not uploaded' });
         }
 
-        logInfo(`File uploaded to server: ${req.file.originalname} (${req.file.size} bytes)`);
+        logInfo(`File received in memory: ${req.file.originalname} (${req.file.size} bytes)`);
 
-        // Upload file to Qwen OSS storage
-        const result = await uploadFileToQwen(req.file.path);
-
-        // Delete temporary file after successful upload
-        fs.unlinkSync(req.file.path);
+        // Upload file buffer directly to Qwen OSS storage (no disk write)
+        const result = await uploadFileToQwen({
+            buffer: req.file.buffer,
+            filename: req.file.originalname,
+            size: req.file.size,
+            mimetype: req.file.mimetype
+        });
 
         if (result.success) {
             logInfo(`File successfully uploaded to OSS: ${result.fileName}`);
@@ -612,6 +598,7 @@ router.post('/files/upload', upload.single('file'), async (req, res) => {
                 file: {
                     name: result.fileName,
                     url: result.url,
+                    fileId: result.fileId,
                     size: req.file.size,
                     type: req.file.mimetype
                 }
@@ -622,11 +609,6 @@ router.post('/files/upload', upload.single('file'), async (req, res) => {
         }
     } catch (error) {
         logError('Error uploading file', error);
-
-        // Delete temporary file in case of error
-        if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-            fs.unlinkSync(req.file.path);
-        }
 
         res.status(500).json({ error: 'Internal server error' });
     }

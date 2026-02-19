@@ -1,90 +1,31 @@
 // Simplified chat.js - Direct HTTP calls, no browser automation
 import { getAvailableToken, markRateLimited, removeInvalidToken } from './tokenManager.js';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { AVAILABLE_MODELS, API_KEYS } from '../config.js';
 import crypto from 'crypto';
 import fetch from 'node-fetch';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const CHAT_API_URL_V2 = 'https://chat.qwen.ai/api/v2/chat/completions';
 const CREATE_CHAT_URL = 'https://chat.qwen.ai/api/v2/chats/new';
 const TASK_STATUS_URL = 'https://chat.qwen.ai/api/v1/tasks/status';
 
-const MODELS_FILE = path.join(__dirname, '..', 'AvailableModels.txt');
-const AUTH_KEYS_FILE = path.join(__dirname, '..', 'Authorization.txt');
-
-let availableModels = null;
-let authKeys = null;
-
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// ==================== File Helpers ====================
+// ==================== Models & Auth ====================
 
 export function getAvailableModelsFromFile() {
-    try {
-        if (!fs.existsSync(MODELS_FILE)) {
-            console.error(`Models file not found: ${MODELS_FILE}`);
-            return ['qwen-max-latest'];
-        }
-
-        const fileContent = fs.readFileSync(MODELS_FILE, 'utf8');
-        const models = fileContent.split('\n')
-            .map(line => line.trim())
-            .filter(line => line && !line.startsWith('#'));
-
-        console.log('===== AVAILABLE MODELS =====');
-        models.forEach(model => console.log(`- ${model}`));
-        console.log('============================');
-
-        return models;
-    } catch (error) {
-        console.error('Error reading models file:', error);
-        return ['qwen-max-latest'];
-    }
-}
-
-function getAuthKeysFromFile() {
-    try {
-        if (!fs.existsSync(AUTH_KEYS_FILE)) {
-            const template = `# API Keys File for Proxy\n# ------------------------\n# List your API keys here (one per line)\n# Empty file = no auth required\n# Lines starting with # are ignored\n\n`;
-            try {
-                fs.writeFileSync(AUTH_KEYS_FILE, template, { encoding: 'utf8', flag: 'wx' });
-                console.log(`Created template: ${AUTH_KEYS_FILE}`);
-            } catch (e) {
-                console.error('Could not create Authorization.txt:', e);
-            }
-            return [];
-        }
-
-        const fileContent = fs.readFileSync(AUTH_KEYS_FILE, 'utf8');
-        const keys = fileContent.split('\n')
-            .map(line => line.trim())
-            .filter(line => line && !line.startsWith('#'));
-
-        return keys;
-    } catch (error) {
-        console.error('Error reading auth keys file:', error);
-        return [];
-    }
+    console.log('===== AVAILABLE MODELS =====');
+    AVAILABLE_MODELS.forEach(model => console.log(`- ${model}`));
+    console.log('============================');
+    return AVAILABLE_MODELS;
 }
 
 export function isValidModel(modelName) {
-    if (!availableModels) {
-        availableModels = getAvailableModelsFromFile();
-    }
-    return availableModels.includes(modelName);
+    return AVAILABLE_MODELS.includes(modelName);
 }
 
 export function getAllModels() {
-    if (!availableModels) {
-        availableModels = getAvailableModelsFromFile();
-    }
-
     return {
-        models: availableModels.map(model => ({
+        models: AVAILABLE_MODELS.map(model => ({
             id: model,
             name: model,
             description: `Model ${model}`
@@ -93,10 +34,7 @@ export function getAllModels() {
 }
 
 export function getApiKeys() {
-    if (!authKeys) {
-        authKeys = getAuthKeysFromFile();
-    }
-    return authKeys;
+    return API_KEYS;
 }
 
 // ==================== Chat API ====================
@@ -237,10 +175,6 @@ export async function sendMessage(
     size = null,
     waitForCompletion = true
 ) {
-    if (!availableModels) {
-        availableModels = getAvailableModelsFromFile();
-    }
-
     // Create new chat if not provided
     if (!chatId) {
         const newChatResult = await createChatV2(model);

@@ -44,3 +44,29 @@ export const DEFAULT_MODEL = process.env.DEFAULT_MODEL || 'qwen-max-latest';
 export const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
 export const LOG_MAX_SIZE = Number(process.env.LOG_MAX_SIZE) || 5_242_880; // 5 MB
 export const LOG_MAX_FILES = Number(process.env.LOG_MAX_FILES) || 5;
+
+// ─── Модели ──────────────────────────────────────────────────────────────────
+export const AVAILABLE_MODELS = [
+    'qwen3-max',
+    'qwen3-vl-plus',
+    'qwen3-coder-plus',
+    'qwen3-omni-flash',
+    'qwen-plus-2025-09-11',
+    'qwen3-235b-a22b',
+    'qwen3-30b-a3b',
+    'qwen3-coder-30b-a3b-instruct',
+    'qwen-max-latest',
+    'qwen-plus-2025-01-25',
+    'qwq-32b',
+    'qwen-turbo-2025-02-11',
+    'qwen2.5-omni-7b',
+    'qvq-72b-preview-0310',
+    'qwen2.5-vl-32b-instruct',
+    'qwen2.5-14b-instruct-1m',
+    'qwen2.5-coder-32b-instruct',
+    'qwen2.5-72b-instruct'
+];
+
+// ─── Ключи авторизации ───────────────────────────────────────────────────────
+// API keys for proxy authentication (optional, comma-separated)
+export const API_KEYS = process.env.API_KEYS ? process.env.API_KEYS.split(',').map(k => k.trim()).filter(k => k) : [];
