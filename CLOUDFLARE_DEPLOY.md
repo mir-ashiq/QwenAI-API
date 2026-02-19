@@ -51,16 +51,20 @@ npx wrangler secret put QWEN_TOKEN
 # Paste your token when prompted
 ```
 
-**Optional (for authorization):**
+**Optional - Authorization (skip this for public access):**
+
+If you want to protect your API with authorization, set API_KEYS. **If you skip this step, your API will be publicly accessible without authentication.**
 
 ```bash
-# Set API keys for authorization (OPTIONAL - skip for public access)
+# OPTIONAL: Set API keys for authorization
 npx wrangler secret put API_KEYS
 # Enter: my-secret-key-1,admin-key-xyz
-# OR leave empty/skip this step for no authorization
 ```
 
-> **💡 Tip:** If you don't set `API_KEYS`, your API will be publicly accessible without authorization. This is fine for testing but not recommended for production.
+> **💡 Note:**
+>
+> - **Don't set API_KEYS** = Public access (no authorization required)
+> - **Set API_KEYS** = Protected access (Authorization header required)
 
 ### 5. Deploy!
 
@@ -94,9 +98,9 @@ curl https://qwen-api-proxy.your-subdomain.workers.dev/api/models \
 - `QWEN_TOKEN` - Single Qwen authentication token
 - OR `QWEN_TOKENS` - Multiple tokens (comma-separated) for load balancing
 
-**Optional:**
+**Optional (don't set for public access):**
 
-- `API_KEYS` - Proxy authorization keys (comma-separated)
+- `API_KEYS` - Comma-separated authorization keys. If not set, API works without authentication (public access).
 
 ### Custom Domain
 

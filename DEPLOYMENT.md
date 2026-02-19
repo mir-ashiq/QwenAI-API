@@ -261,9 +261,13 @@ Create a `.dev.vars` file for local development:
 ```bash
 # .dev.vars (for local testing only)
 QWEN_TOKEN=your-token-here
-API_KEYS=my-secret-key-1,admin-key-xyz
+
+# Optional: Leave empty or remove for public access
+API_KEYS=
 ```
 
+> 💡 **Tip:** Leave `API_KEYS` empty for public access (no authorization). Add keys like `my-key-1,my-key-2` to require authorization.
+>
 > ⚠️ **Important:** Add `.dev.vars` to `.gitignore` to keep secrets safe!
 
 #### 3. Test Locally
@@ -286,22 +290,34 @@ curl http://localhost:8787/api/models
 
 Set environment variables in Cloudflare (not stored in code):
 
+**Required:**
+
 ```bash
-# Set Qwen token
+# Set Qwen token (REQUIRED)
 npx wrangler secret put QWEN_TOKEN
 # Paste your token when prompted
-
-# Set API keys for proxy authorization
-npx wrangler secret put API_KEYS
-# Enter: my-secret-key-1,admin-key-xyz
 ```
 
-Or use multiple tokens:
+Or use multiple tokens for load balancing:
 
 ```bash
 npx wrangler secret put QWEN_TOKENS
 # Enter: token1,token2,token3
 ```
+
+**Optional - Skip for public access:**
+
+```bash
+# OPTIONAL: Set API keys for authorization
+# Don't run this command if you want public access
+npx wrangler secret put API_KEYS
+# Enter: my-secret-key-1,admin-key-xyz
+```
+
+> 💡 **Authorization Options:**
+>
+> - **Don't set API_KEYS** = Public access (no auth required)
+> - **Set API_KEYS** = Protected (Authorization header required)
 
 #### 5. Deploy to Cloudflare Workers
 
@@ -312,6 +328,14 @@ npm run deploy:worker
 You'll get a URL like: `https://qwen-api-proxy.your-subdomain.workers.dev`
 
 #### 6. Test Your Deployment
+
+**Without Authorization (if API_KEYS not set):**
+
+```bash
+curl https://qwen-api-proxy.your-subdomain.workers.dev/api/models
+```
+
+**With Authorization (if API_KEYS is set):**
 
 ```bash
 curl https://qwen-api-proxy.your-subdomain.workers.dev/api/models \

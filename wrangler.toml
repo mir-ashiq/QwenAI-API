@@ -8,14 +8,17 @@ compatibility_flags = ["nodejs_compat"]
 name = "qwen-api-proxy"
 workers_dev = false
 
-# Optional Variables (can be left empty)
-[vars]
-API_KEYS = ""  # Optional: Comma-separated API keys for authorization. Leave empty for no auth.
-
-# Required Secrets (set via: wrangler secret put QWEN_TOKEN)
-# - QWEN_TOKEN: Single Qwen authentication token
-# OR
-# - QWEN_TOKENS: Multiple tokens (comma-separated) for load balancing
+# Environment Variables:
+# REQUIRED (set as secrets):
+#   - QWEN_TOKEN: Single Qwen authentication token
+#     OR
+#   - QWEN_TOKENS: Multiple tokens (comma-separated) for load balancing
+#
+# OPTIONAL (set as secret or leave unset):
+#   - API_KEYS: Comma-separated keys for proxy authorization
+#     If not set, API works without authorization (public access)
+#
+# Set secrets via: npx wrangler secret put SECRET_NAME
 
 # Limits
 [limits]
