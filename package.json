@@ -1,22 +1,27 @@
 {
   "name": "qwen-api-proxy",
-  "version": "1.0.0",
-  "description": "Proxy server for access to Qwen API without browser automation",
+  "version": "2.0.0",
+  "description": "Serverless-ready proxy for Qwen API with zero file system dependencies. Deploy to Cloudflare Workers, Railway, AWS Lambda, or any cloud platform.",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "start": "node index.js",
     "addToken": "node scripts/addToken.js",
-    "test": "node test-features.js",
-    "test:quick": "node quick-test-simple.js"
+    "test": "node test-all-features.js",
+    "test:quick": "node quick-test-simple.js",
+    "dev:worker": "wrangler dev",
+    "deploy:worker": "wrangler deploy",
+    "tail:worker": "wrangler tail"
   },
   "dependencies": {
+    "@cloudflare/workers-types": "^4.20260219.0",
     "ali-oss": "^6.23.0",
     "axios": "^1.9.0",
     "body-parser": "^1.20.2",
     "dotenv": "^16.6.1",
     "express": "^4.18.2",
     "form-data": "^4.0.2",
+    "hono": "^4.11.10",
     "morgan": "^1.10.0",
     "multer": "^2.0.0",
     "node-fetch": "^3.3.2",
@@ -24,5 +29,8 @@
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "winston": "^3.17.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.66.0"
   }
 }

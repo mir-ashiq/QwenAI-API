@@ -1,0 +1,15 @@
+# .dev.vars.example
+# Cloudflare Workers local development environment variables
+# Copy this file to .dev.vars and add your actual values
+# IMPORTANT: Never commit .dev.vars to git!
+
+# Qwen Authentication (required)
+# Get your token from: https://chat.qwen.ai → F12 → Application → Local Storage → token
+QWEN_TOKEN=your-qwen-token-here
+
+# Or use multiple tokens (comma-separated)
+# QWEN_TOKENS=token1,token2,token3
+
+# Proxy Authorization (optional but recommended)
+# Comma-separated API keys that clients must provide
+API_KEYS=my-secret-key-1,admin-key-xyz

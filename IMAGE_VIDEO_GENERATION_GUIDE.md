@@ -8,6 +8,8 @@ The Qwen API Proxy supports three content generation types through the `chatType
 - **Image Generation (t2i)**: Text-to-Image - **Streaming** response (~10-20s)
 - **Video Generation (t2v)**: Text-to-Video - **Task polling** system (~30-60s)
 
+**🚀 File Uploads**: All file uploads use **in-memory storage** (no disk writes) with direct buffer transfer to Alibaba OSS. Supports up to 25MB files, perfect for serverless deployment.
+
 ## 🔑 Key Differences
 
 | Feature              | Text (t2t)          | Image (t2i)                  | Video (t2v)                     |
@@ -200,17 +202,18 @@ Content-Type: application/json
 
 ### Parameters
 
-| Parameter           | Required    | Description                                             | Example Values                                          |
-| ------------------- | ----------- | ------------------------------------------------------- | ------------------------------------------------------- |
-| `message`           | ✅ Yes      | Text description of the video to generate               | "A serene forest with sunlight filtering through trees" |
-| `model`             | ✅ Yes      | Model to use for generation                             | `qwen-vl-max-latest`                                    |
-| `chatType`          | ✅ Yes      | Must be `"t2v"` for video generation                    | `"t2v"`                                                 |
-| `size`              | ⚠️ Optional | Video aspect ratio (default: `"16:9"`)                  | `"16:9"`, `"9:16"`, `"1:1"`, `"4:3"`                    |
-| `waitForCompletion` | ⚠️ Optional | Server polls until complete (default: `true`)           | `true` (server polls), `false` (return task_id)         |
-| `chatId`            | ⚠️ Optional | Existing chat ID to continue context                    | From previous response                                  |
-| `parentId`          | ⚠️ Optional | Parent message ID for conversation flow                 | From previous response                                  |
+| Parameter           | Required    | Description                                   | Example Values                                          |
+| ------------------- | ----------- | --------------------------------------------- | ------------------------------------------------------- |
+| `message`           | ✅ Yes      | Text description of the video to generate     | "A serene forest with sunlight filtering through trees" |
+| `model`             | ✅ Yes      | Model to use for generation                   | `qwen-vl-max-latest`                                    |
+| `chatType`          | ✅ Yes      | Must be `"t2v"` for video generation          | `"t2v"`                                                 |
+| `size`              | ⚠️ Optional | Video aspect ratio (default: `"16:9"`)        | `"16:9"`, `"9:16"`, `"1:1"`, `"4:3"`                    |
+| `waitForCompletion` | ⚠️ Optional | Server polls until complete (default: `true`) | `true` (server polls), `false` (return task_id)         |
+| `chatId`            | ⚠️ Optional | Existing chat ID to continue context          | From previous response                                  |
+| `parentId`          | ⚠️ Optional | Parent message ID for conversation flow       | From previous response                                  |
 
 **Important Notes:**
+
 - Video size uses **aspect ratio format** (e.g., `"16:9"`) not pixel dimensions
 - `waitForCompletion=true`: Server polls automatically (simple, fixed 3-min timeout)
 - `waitForCompletion=false`: Returns task_id immediately (flexible, client controls polling)
@@ -282,7 +285,7 @@ const response = await fetch("http://localhost:3264/api/chat", {
     model: "qwen-vl-max-latest",
     chatType: "t2v",
     size: "16:9",
-    waitForCompletion: true  // Can be omitted (default)
+    waitForCompletion: true, // Can be omitted (default)
   }),
 });
 
@@ -310,7 +313,7 @@ const taskResponse = await fetch("http://localhost:3264/api/chat", {
     model: "qwen-vl-max-latest",
     chatType: "t2v",
     size: "16:9",
-    waitForCompletion: false  // Return task_id immediately
+    waitForCompletion: false, // Return task_id immediately
   }),
 });
 
@@ -326,19 +329,21 @@ const maxAttempts = 90; // 3 minutes max (customize as needed)
 
 while (attempts < maxAttempts && !videoUrl) {
   attempts++;
-  await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
-  
-  const statusResponse = await fetch(`http://localhost:3264/api/tasks/status/${taskId}`);
+  await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds
+
+  const statusResponse = await fetch(
+    `http://localhost:3264/api/tasks/status/${taskId}`,
+  );
   const statusData = await statusResponse.json();
-  
+
   const status = statusData.task_status || statusData.status;
   console.log(`Attempt ${attempts}: ${status}`);
-  
-  if (status === 'completed' || status === 'succeeded') {
+
+  if (status === "completed" || status === "succeeded") {
     videoUrl = statusData.content || statusData.data?.content;
     console.log("Video ready:", videoUrl);
     break;
-  } else if (status === 'failed' || status === 'error') {
+  } else if (status === "failed" || status === "error") {
     console.error("Task failed");
     break;
   }
@@ -348,6 +353,7 @@ while (attempts < maxAttempts && !videoUrl) {
 #### cURL Examples
 
 **Server-side polling:**
+
 ```bash
 curl -X POST http://localhost:3264/api/chat \
   --max-time 200 \
@@ -361,6 +367,7 @@ curl -X POST http://localhost:3264/api/chat \
 ```
 
 **Client-side polling:**
+
 ```bash
 # Step 1: Create task
 TASK_ID=$(curl -X POST http://localhost:3264/api/chat \

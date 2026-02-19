@@ -2,6 +2,8 @@
 
 This document provides a complete reference for configuring the Qwen API Proxy via environment variables.
 
+> **🚀 Serverless Ready:** All configuration can be done via environment variables, making this proxy fully compatible with Railway, Render, AWS Lambda, Google Cloud Run, and other serverless platforms.
+
 ## 📋 Configuration File
 
 Create a `.env` file in the project root directory.
@@ -14,6 +16,8 @@ cp .env.example .env
 ---
 
 ## 🔑 Authentication Tokens
+
+> **Recommended for Serverless:** Use environment variables instead of file-based token storage for cloud deployments.
 
 ### QWEN_TOKEN (Single Token)
 
@@ -55,7 +59,42 @@ QWEN_TOKENS=eyJhbGciOiJIUzI1Ni...,eyJhbGciOiJIUzI1Ni...,eyJhbGciOiJIUzI1Ni...
 
 ---
 
-## 🖥️ Server Configuration
+## � Proxy Authorization
+
+### API_KEYS (Proxy Access Control)
+
+Configure API keys that clients must provide to access your proxy server.
+
+```bash
+API_KEYS=my-secret-key-1,admin-key-xyz,client-key-abc
+```
+
+**Use case:**
+
+- Protect your proxy from unauthorized access
+- Control who can use your deployed proxy
+- Required for production deployments
+
+**How clients authenticate:**
+
+```bash
+curl -X POST http://your-proxy.com/api/chat \
+  -H "Authorization: Bearer my-secret-key-1" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hello"}'
+```
+
+**Disabling Authorization:**
+
+- Leave `API_KEYS` empty or unset
+- Ensure `src/Authorization.txt` is empty or doesn't exist
+- Proxy will accept all requests without authentication
+
+> **⚠️ Security Warning:** Always use API_KEYS in production deployments to prevent unauthorized access.
+
+---
+
+## �🖥️ Server Configuration
 
 ### PORT
 
@@ -133,13 +172,19 @@ HOST=0.0.0.0
 # Logging
 LOG_LEVEL=info
 
-# Authentication (choose one method)
+# Proxy Authorization (recommended for production)
+API_KEYS=my-secret-key-1,admin-key-xyz,client-key-abc
+
+# Qwen Authentication (choose one method)
 
 # Method 1: Single token
 QWEN_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImI0MDkzYTEwLTNlMGQtNDEwYi1iZTIwLTQ5M2ZiNThhMWRhNiIsImxhc3RfcGFzc3dvcmRfY2hhbmdlIjoxNzcxMjI1MDA4LCJleHAiOjE3NzM5MTAxMzV9.lBUD7kHiDoYTZcCqeJwq9FR3zJpxCX4OydT58og9Cbw
 
 # Method 2: Multiple tokens (comma-separated)
 # QWEN_TOKENS=token1,token2,token3
+
+# Account Menu (Docker/CI)
+SKIP_ACCOUNT_MENU=false
 ```
 
 ---

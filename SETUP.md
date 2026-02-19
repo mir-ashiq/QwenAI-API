@@ -1,6 +1,8 @@
-# 🚀 Setup Guide - Qwen API Proxy (No Browser Automation)
+# 🚀 Setup Guide - Qwen API Proxy
 
 This guide will help you set up and run the Qwen API Proxy server.
+
+> **✨ Serverless Ready:** This proxy is fully compatible with serverless platforms (Railway, Render, AWS Lambda, Google Cloud Run). See [DEPLOYMENT.md](DEPLOYMENT.md) for cloud deployment guides.
 
 ## 📋 Prerequisites
 

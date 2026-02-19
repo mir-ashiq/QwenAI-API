@@ -2,7 +2,14 @@
 
 [Русская версия](README_RU.md) | English
 
-A powerful local API proxy server for Qwen AI that provides free access through browser automation. Supports text chat, image analysis, image generation, and video generation.
+**A serverless-ready API proxy for Qwen AI with zero file system dependencies.** Optimized for cloud deployment on platforms like Cloudflare Workers, Railway, Render, or traditional servers.
+
+## 🚀 Deploy Now
+
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/mir-ashiq/QwenAI-API)
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/QwenAI-API?referralCode=mir-ashiq)
+
+> **Quick Deploy:** Click a button above to deploy in minutes. See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed guides for all platforms.
 
 ## ✨ Key Features
 
@@ -10,11 +17,13 @@ A powerful local API proxy server for Qwen AI that provides free access through 
 - **🖼️ Image Generation (t2i)**: Create images from text descriptions with streaming response
 - **🎬 Video Generation (t2v)**: Generate videos from prompts with automatic task polling
 - **🔍 Image Analysis**: Analyze and describe images using vision models
-- **🔓 Free Access**: No API key required - uses browser automation
+- **📁 File Upload**: In-memory file uploads (no disk storage required)
 - **🔄 Multi-Account**: Token rotation with automatic health monitoring
 - **🤝 OpenAI Compatible**: Drop-in replacement for OpenAI API
-- **📁 File Upload**: Direct file upload to Qwen CDN
 - **⚡ API v2**: Latest Qwen API with server-side chat history
+- **☁️ Serverless Ready**: No file system dependencies - deploy anywhere
+- **🚀 Zero Disk I/O**: All operations in memory (logging, uploads, config)
+- **🌍 Environment-Based**: Configure via .env variables only
 
 ## ⚡ API v2 Update
 
@@ -93,7 +102,27 @@ const res2 = await fetch("/api/chat", {
 npm install
 ```
 
-### 1.2 Running
+### 1.2 Configuration
+
+Create a `.env` file (copy from `.env.example`):
+
+```bash
+PORT=3264
+QWEN_TOKEN=your_token_here
+# Or multiple tokens:
+# QWEN_TOKENS=token1,token2,token3
+
+# Optional: API keys for proxy authentication
+# API_KEYS=key1,key2,key3
+```
+
+**Get your Qwen token:**
+
+1. Visit https://chat.qwen.ai and login
+2. Open DevTools (F12) → Application → Local Storage
+3. Copy the `token` value
+
+### 1.3 Running
 
 ```bash
 npm start
@@ -105,7 +134,7 @@ Quick launch file is also available:
 start.bat
 ```
 
-### 1.3 Interactive API Documentation
+### 1.4 Interactive API Documentation
 
 Once the server is running, access the **Swagger UI** documentation at:
 
@@ -120,7 +149,24 @@ The Swagger interface provides:
 - 📋 Request/response schemas
 - ✅ Live API interaction
 
-### 1.4 Running in Docker
+### 1.5 Deployment Options
+
+This proxy is **serverless-ready** with zero file system dependencies:
+
+#### ☁️ **Cloud Platforms (Recommended)**
+
+- **Railway** / **Render** / **Heroku**: Direct GitHub deployment
+  - Just connect your repo and set `QWEN_TOKEN` environment variable
+  - Zero configuration needed
+- **Cloudflare Workers**: Requires Express→Hono conversion
+  - All file operations already removed
+  - See `DEPLOYMENT.md` for migration guide
+
+- **AWS Lambda** / **Google Cloud Functions**: Works out of the box
+
+#### 🐳 **Docker**
+
+### 1.6 Running in Docker
 
 1. Complete authorization and collect tokens:
 
@@ -140,7 +186,43 @@ docker compose up --build -d
 
 ---
 
-## 2. API Documentation
+## 2. Architecture & Serverless Compatibility
+
+### \ud83c\udfd7\ufe0f Zero File System Dependencies
+
+This proxy has been optimized to run on serverless platforms with **no persistent disk access**:
+
+#### **Console-Only Logging**
+
+- \u2705 No log files created
+- \u2705 All logs output to stdout/stderr
+- \u2705 Compatible with cloud logging systems (CloudWatch, Stackdriver, etc.)
+
+#### **In-Memory File Uploads**
+
+- \u2705 Files stored in RAM during processing
+- \u2705 Direct buffer transfer to Alibaba OSS
+- \u2705 No temporary files written to disk
+- \u2705 Supports up to 25MB uploads
+
+#### **Configuration from Environment**
+
+- \u2705 Models list: Hardcoded in `src/config.js`
+- \u2705 Auth keys: `API_KEYS` environment variable
+- \u2705 Tokens: `QWEN_TOKEN` or `QWEN_TOKENS` environment variables
+- \u2705 Optional file-based token storage (gracefully degrades if unavailable)
+
+#### **What This Enables**
+
+- \u2705 Deploy to Cloudflare Workers (with Express\u2192Hono conversion)
+- \u2705 Deploy to AWS Lambda, Google Cloud Functions
+- \u2705 Deploy to Railway, Render, Heroku (zero config)
+- \u2705 Run in containerized environments
+- \u2705 Horizontal scaling without shared state issues
+
+---
+
+## 3. API Documentation
 
 ### Web Interface
 
@@ -156,14 +238,23 @@ The documentation includes:
 
 ### Authorization via API Keys
 
-> ⚠️ **Important:** if the `src/Authorization.txt` file is empty, authorization is **disabled**.
+> ⚠️ **New:** Authorization now uses environment variables for serverless compatibility.
+
+**Option 1: Environment Variable (Recommended for deployment)**
+
+Set the `API_KEYS` environment variable in your `.env` file:
+
+```bash
+API_KEYS=key1,key2,key3
+```
+
+**Option 2: Legacy File (Optional, for backward compatibility)**
 
 1. **File `src/Authorization.txt`**
    - Created automatically on first run _if it doesn't exist_.
-   - Contains detailed template instructions.
    - One token **per line**. Empty lines and lines starting with `#` are ignored.
 
-2. **Disable authorization** – leave the file empty. Middleware will pass all requests.
+2. **Disable authorization** – leave both `API_KEYS` empty and the file empty.
 
 3. **Client-side verification**
 
@@ -184,9 +275,36 @@ The documentation includes:
 
 ---
 
-## 3. Account Management (Multi-Account)
+## 4. Token Management
 
-When starting `npm start`, an interactive menu appears:
+### Environment Variable Configuration (Recommended)
+
+The easiest way to configure tokens is via environment variables in your `.env` file:
+
+**Single Token:**
+
+```bash
+QWEN_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Multiple Tokens (Load Balancing):**
+
+```bash
+QWEN_TOKENS=token1,token2,token3
+```
+
+**Features:**
+
+- \u2705 Automatic load balancing across multiple tokens
+- \u2705 Rate limit handling (24-hour cooldown)
+- \u2705 Invalid token detection and rotation
+- \u2705 Works without file system access
+
+### Legacy Account Management (Optional)
+
+For backward compatibility, you can still use file-based token storage via `npm run addToken` or the interactive menu. However, **environment variables are recommended** for deployment.
+
+When starting `npm start` without `SKIP_ACCOUNT_MENU=true`, an interactive menu appears:
 
 ```
 Account List:
@@ -987,7 +1105,18 @@ The proxy supports various Qwen models:
 
 ---
 
-## 📄 License
+## � Additional Documentation
+
+For detailed information about specific topics:
+
+- **[Deployment Guide](DEPLOYMENT.md)** - Complete guide for deploying to Railway, Render, AWS Lambda, Google Cloud Run, Vercel, Cloudflare Workers, and Docker
+- **[Architecture Documentation](ARCHITECTURE.md)** - Technical architecture, component design, request flows, security model, and scalability considerations
+- **[Image & Video Generation Guide](IMAGE_VIDEO_GENERATION_GUIDE.md)** - Detailed guide for text-to-image (t2i) and text-to-video (t2v) generation features
+- **[Interactive API Documentation](http://localhost:3264/api-docs)** - Swagger UI for testing endpoints (available when server is running)
+
+---
+
+## �📄 License
 
 This project is provided as-is for educational purposes only.
 
