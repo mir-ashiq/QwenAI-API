@@ -8,17 +8,17 @@ compatibility_flags = ["nodejs_compat"]
 name = "qwen-api-proxy"
 workers_dev = false
 
-# Environment Variables:
-# REQUIRED (set as secrets):
-#   - QWEN_TOKEN: Single Qwen authentication token
-#     OR
-#   - QWEN_TOKENS: Multiple tokens (comma-separated) for load balancing
+# Required Environment Variables (set as secrets):
 #
-# OPTIONAL (set as secret or leave unset):
-#   - API_KEYS: Comma-separated keys for proxy authorization
-#     If not set, API works without authorization (public access)
+# QWEN_TOKEN - Single Qwen authentication token
+#   Get from: https://chat.qwen.ai → F12 → Application → Local Storage → token
 #
-# Set secrets via: npx wrangler secret put SECRET_NAME
+# OR use multiple tokens for load balancing:
+# QWEN_TOKENS - Comma-separated tokens
+#
+# Set via: npx wrangler secret put QWEN_TOKEN
+#
+# Optional: You can add API_KEYS via dashboard later for authorization
 
 # Limits
 [limits]

@@ -261,14 +261,11 @@ Create a `.dev.vars` file for local development:
 ```bash
 # .dev.vars (for local testing only)
 QWEN_TOKEN=your-token-here
-
-# Optional: Leave empty or remove for public access
-API_KEYS=
 ```
 
-> 💡 **Tip:** Leave `API_KEYS` empty for public access (no authorization). Add keys like `my-key-1,my-key-2` to require authorization.
->
 > ⚠️ **Important:** Add `.dev.vars` to `.gitignore` to keep secrets safe!
+>
+> 💡 **Tip:** This works with public access by default. Add `API_KEYS=your-keys` to `.dev.vars` if you need authorization during local development.
 
 #### 3. Test Locally
 
@@ -288,7 +285,7 @@ curl http://localhost:8787/api/models
 
 #### 4. Set Production Environment Variables
 
-Set environment variables in Cloudflare (not stored in code):
+Set environment variables in Cloudflare:
 
 **Required:**
 
@@ -305,19 +302,11 @@ npx wrangler secret put QWEN_TOKENS
 # Enter: token1,token2,token3
 ```
 
-**Optional - Skip for public access:**
+That's it! Your API will work with public access (no authorization).
 
-```bash
-# OPTIONAL: Set API keys for authorization
-# Don't run this command if you want public access
-npx wrangler secret put API_KEYS
-# Enter: my-secret-key-1,admin-key-xyz
-```
+**Optional - Add Authorization Later:**
 
-> 💡 **Authorization Options:**
->
-> - **Don't set API_KEYS** = Public access (no auth required)
-> - **Set API_KEYS** = Protected (Authorization header required)
+You can add API_KEYS anytime via Cloudflare Dashboard (Settings → Variables & Secrets) or CLI if you need to restrict access later.
 
 #### 5. Deploy to Cloudflare Workers
 

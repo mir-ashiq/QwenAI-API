@@ -24,8 +24,9 @@ Edit `.dev.vars` and add your actual Qwen token:
 
 ```bash
 QWEN_TOKEN=your-actual-token-here
-API_KEYS=my-secret-key-1
 ```
+
+> **Note:** This enables public access by default. Add `API_KEYS=your-keys` if you need authorization during local testing.
 
 ### 3. Test Locally
 
@@ -51,20 +52,16 @@ npx wrangler secret put QWEN_TOKEN
 # Paste your token when prompted
 ```
 
-**Optional - Authorization (skip this for public access):**
+That's it! Your worker will deploy with public access (no authorization).
 
-If you want to protect your API with authorization, set API_KEYS. **If you skip this step, your API will be publicly accessible without authentication.**
+**Optional - Add Authorization Later:**
 
-```bash
-# OPTIONAL: Set API keys for authorization
-npx wrangler secret put API_KEYS
-# Enter: my-secret-key-1,admin-key-xyz
-```
+If you want to protect your API later, you can add API_KEYS anytime via:
 
-> **💡 Note:**
->
-> - **Don't set API_KEYS** = Public access (no authorization required)
-> - **Set API_KEYS** = Protected access (Authorization header required)
+- Cloudflare Dashboard → Your Worker → Settings → Variables & Secrets
+- Or via CLI: `npx wrangler secret put API_KEYS`
+
+> **💡 Note:** By default, your API works without authorization (public access). Add API_KEYS only if you need to restrict access.
 
 ### 5. Deploy!
 

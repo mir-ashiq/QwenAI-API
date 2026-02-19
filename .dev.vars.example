@@ -9,12 +9,10 @@
 # Get your token from: https://chat.qwen.ai → F12 → Application → Local Storage → token
 QWEN_TOKEN=your-qwen-token-here
 
-# Or use multiple tokens (comma-separated)
+# Or use multiple tokens for load balancing (comma-separated)
 # QWEN_TOKENS=token1,token2,token3
 
 # ═══════════════════════════════════════════
-# OPTIONAL: Proxy Authorization
+# Note: You can add API_KEYS in Cloudflare Dashboard
+# for authorization if needed (optional)
 # ═══════════════════════════════════════════
-# Leave empty or remove this line for no authorization (public access)
-# Add comma-separated API keys to require authorization from clients
-API_KEYS=
