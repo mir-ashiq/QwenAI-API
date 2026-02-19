@@ -202,6 +202,9 @@ async function sendMessage(messageContent, model, chatId, parentId, chatType = '
     let responseId = null;
     let resultChatId = chatId;
     let resultParentId = parentId;
+    let taskId = null;
+    let imageUrl = null;
+    let videoUrl = null;
     
     // Process SSE lines
     const lines = fullText.split('\n');
@@ -228,6 +231,22 @@ async function sendMessage(messageContent, model, chatId, parentId, chatType = '
                 resultChatId = chunk.chat_id;
             }
             
+            // For image/video generation, check for task_id, image_url, video_url at chunk level
+            if (chatType !== 't2t') {
+                if (chunk.task_id || chunk.taskId) {
+                    taskId = chunk.task_id || chunk.taskId;
+                    console.log('Found taskId:', taskId);
+                }
+                if (chunk.image_url || chunk.imageUrl) {
+                    imageUrl = chunk.image_url || chunk.imageUrl;
+                    console.log('Found imageUrl:', imageUrl);
+                }
+                if (chunk.video_url || chunk.videoUrl) {
+                    videoUrl = chunk.video_url || chunk.videoUrl;
+                    console.log('Found videoUrl:', videoUrl);
+                }
+            }
+            
             // Extract content from choices
             if (chunk.choices && Array.isArray(chunk.choices) && chunk.choices.length > 0) {
                 const choice = chunk.choices[0];
@@ -247,34 +266,59 @@ async function sendMessage(messageContent, model, chatId, parentId, chatType = '
         }
     }
     
-    // For image/video generation, check if we got a task ID or URL
+    // For image/video generation, return task ID or URL if found
     if (chatType !== 't2t') {
-        // Check if fullContent contains a URL or task ID
-        try {
-            const parsedContent = JSON.parse(fullContent || '{}');
-            if (parsedContent.taskId || parsedContent.task_id) {
-                return {
-                    taskId: parsedContent.taskId || parsedContent.task_id,
-                    chatId: resultChatId,
-                    parentId: responseId
-                };
+        if (taskId) {
+            return {
+                taskId: taskId,
+                chatId: resultChatId,
+                parentId: responseId,
+                message: 'Task created. Use /api/tasks/status/:taskId to check status.'
+            };
+        }
+        if (imageUrl) {
+            return {
+                imageUrl: imageUrl,
+                chatId: resultChatId,
+                parentId: responseId
+            };
+        }
+        if (videoUrl) {
+            return {
+                videoUrl: videoUrl,
+                chatId: resultChatId,
+                parentId: responseId
+            };
+        }
+        // If no taskId/URL found, try parsing content as JSON
+        if (fullContent) {
+            try {
+                const parsedContent = JSON.parse(fullContent);
+                if (parsedContent.taskId || parsedContent.task_id) {
+                    return {
+                        taskId: parsedContent.taskId || parsedContent.task_id,
+                        chatId: resultChatId,
+                        parentId: responseId,
+                        message: 'Task created. Check status with the taskId.'
+                    };
+                }
+                if (parsedContent.imageUrl || parsedContent.image_url) {
+                    return {
+                        imageUrl: parsedContent.imageUrl || parsedContent.image_url,
+                        chatId: resultChatId,
+                        parentId: responseId
+                    };
+                }
+                if (parsedContent.videoUrl || parsedContent.video_url) {
+                    return {
+                        videoUrl: parsedContent.videoUrl || parsedContent.video_url,
+                        chatId: resultChatId,
+                        parentId: responseId
+                    };
+                }
+            } catch (e) {
+                // Not JSON, treat as regular content
             }
-            if (parsedContent.imageUrl || parsedContent.image_url) {
-                return {
-                    imageUrl: parsedContent.imageUrl || parsedContent.image_url,
-                    chatId: resultChatId,
-                    parentId: responseId
-                };
-            }
-            if (parsedContent.videoUrl || parsedContent.video_url) {
-                return {
-                    videoUrl: parsedContent.videoUrl || parsedContent.video_url,
-                    chatId: resultChatId,
-                    parentId: responseId
-                };
-            }
-        } catch (e) {
-            // Not JSON, treat as regular content
         }
     }
     
