@@ -6,7 +6,7 @@ compatibility_flags = ["nodejs_compat"]
 # Cloudflare Workers Configuration
 [env.production]
 name = "qwen-api-proxy"
-workers_dev = false
+workers_dev = true
 
 # Required Environment Variables (set as secrets):
 #
